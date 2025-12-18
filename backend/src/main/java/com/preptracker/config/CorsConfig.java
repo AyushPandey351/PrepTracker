@@ -13,7 +13,7 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,https://prep-tracker-gold.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -24,30 +24,19 @@ public class CorsConfig {
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
         corsConfiguration.setAllowedOrigins(origins);
         
-        // Also allow all origins in development (can be disabled in production)
-        corsConfiguration.addAllowedOriginPattern("*");
-        
         // Allow all common HTTP methods
         corsConfiguration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
         ));
         
-        // Allow common headers
-        corsConfiguration.setAllowedHeaders(Arrays.asList(
-                "Origin",
-                "Content-Type",
-                "Accept",
-                "Authorization",
-                "X-Requested-With",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
-        ));
+        // Allow all headers
+        corsConfiguration.setAllowedHeaders(List.of("*"));
         
         // Expose headers
         corsConfiguration.setExposedHeaders(List.of("Authorization"));
         
-        // Allow credentials
-        corsConfiguration.setAllowCredentials(true);
+        // Disable credentials to allow more flexible CORS
+        corsConfiguration.setAllowCredentials(false);
         
         // Cache preflight response for 1 hour
         corsConfiguration.setMaxAge(3600L);
