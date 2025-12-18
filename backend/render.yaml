@@ -1,0 +1,19 @@
+# Render Blueprint - Auto-deploy configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: preptracker-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/tabs
+    envVars:
+      - key: MONGODB_URI
+        sync: false  # You'll set this manually (contains secrets)
+      - key: CORS_ORIGINS
+        value: https://preptracker.vercel.app
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
