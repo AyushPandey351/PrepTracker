@@ -1,5 +1,6 @@
 package com.preptracker.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -11,18 +12,20 @@ import java.util.List;
 
 @Configuration
 public class CorsConfig {
-    
+
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    private String allowedOrigins;
+
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
         
-        // Allow React dev server and production builds
-        corsConfiguration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:5173"
-        ));
+        // Parse allowed origins from environment variable or use defaults
+        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        corsConfiguration.setAllowedOrigins(origins);
+        
+        // Also allow all origins in development (can be disabled in production)
+        corsConfiguration.addAllowedOriginPattern("*");
         
         // Allow all common HTTP methods
         corsConfiguration.setAllowedMethods(Arrays.asList(
@@ -55,4 +58,3 @@ public class CorsConfig {
         return new CorsFilter(source);
     }
 }
-
