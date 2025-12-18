@@ -195,7 +195,8 @@ export const cacheApi = {
   clear: (cacheName) => fetchApi(`/cache/${cacheName}`, { method: 'DELETE' }),
 };
 
-export default {
+// Named export for default
+const api = {
   tabs: tabsApi,
   subtopics: subtopicsApi,
   items: itemsApi,
@@ -205,4 +206,6 @@ export default {
   dashboard: dashboardApi,
   cache: cacheApi,
 };
+
+export default api;
 

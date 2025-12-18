@@ -11,8 +11,8 @@ import remarkGfm from 'remark-gfm';
 import {
   BookOpen, Code2, Database, Layers, Cpu, Plus, ChevronDown,
   Check, Trash2, Edit3, X, LayoutDashboard, CheckSquare, Briefcase,
-  Menu, Bold, Italic, List, Link2, ImageIcon, FileCode,
-  Eye, PenTool, GripVertical, Sparkles, ScrollText, Calendar, Zap,
+  Menu, Bold, Italic, List, Link2, FileCode,
+  Eye, PenTool, Sparkles, ScrollText, Zap,
   Loader2, WifiOff, RefreshCw
 } from 'lucide-react';
 
