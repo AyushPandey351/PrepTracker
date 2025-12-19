@@ -613,6 +613,14 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Sidebar Overlay - closes sidebar when clicked */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
@@ -623,6 +631,14 @@ function App() {
               <span className="logo-tagline">Code • Learn • Grow</span>
             </div>
           </div>
+          {/* Close button for mobile */}
+          <button 
+            className="sidebar-close" 
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
