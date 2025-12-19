@@ -704,6 +704,7 @@ body {
   cursor: pointer;
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  order: -1;
 }
 
 .sidebar-toggle:hover {
@@ -713,6 +714,7 @@ body {
 }
 
 .topbar-nav {
+  flex: 1;
   display: flex;
   gap: 6px;
 }
@@ -1945,14 +1947,17 @@ body {
   .topbar {
     padding: 0 12px;
     gap: 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
   }
   
   .sidebar-toggle {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    order: -1;
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-color: var(--accent-primary);
   }
   
   .topbar-nav {
@@ -1962,6 +1967,7 @@ body {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    flex: 1;
   }
   
   .topbar-nav::-webkit-scrollbar {
@@ -2000,9 +2006,9 @@ body {
   }
   
   .sidebar-toggle {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     border-radius: 8px;
   }
   
