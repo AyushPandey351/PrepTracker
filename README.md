@@ -91,15 +91,6 @@ npm start
 
 All data is automatically saved to LocalStorage, so your progress persists between sessions.
 
-## Customization
-
-### Colors
-The app uses CSS custom properties for theming. Edit `src/index.css` to customize:
-- `--accent-primary`: Primary accent color
-- `--accent-secondary`: Secondary accent color
-- `--bg-primary`: Background color
-- And more...
-
 ## License
 
 MIT License - feel free to use and modify for your own projects!
