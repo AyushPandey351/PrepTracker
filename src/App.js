@@ -259,13 +259,15 @@ function App() {
       setLoading(true);
       setError(null);
       
-      const [tabsData, tabsWithSubtopicsData] = await Promise.all([
+      const [tabsData, tabsWithSubtopicsData, statsData] = await Promise.all([
         tabsApi.getAll(),
-        tabsApi.getTabsWithSubtopics()
+        tabsApi.getTabsWithSubtopics(),
+        dashboardApi.getStats()
       ]);
       
       setTabs(tabsData);
       setTabsWithSubtopics(tabsWithSubtopicsData);
+      setDashboardStats(statsData);
       
       if (tabsData.length > 0) {
         setActiveTab(tabsData[0].id);
@@ -358,10 +360,8 @@ function App() {
     try {
       await itemsApi.toggleCompletion(itemId);
       await loadTabData(activeTab);
-      // Refresh dashboard stats if on dashboard
-      if (activeTopNav === 'dashboard') {
-        await loadDashboardStats();
-      }
+      // Always refresh dashboard stats to update sidebar progress
+      await loadDashboardStats();
     } catch (err) {
       console.error('Failed to toggle item:', err);
     }
