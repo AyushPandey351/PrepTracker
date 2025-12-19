@@ -661,6 +661,14 @@ function App() {
       <main className="main-wrapper">
         {/* Top Navbar */}
         <header className="topbar">
+          <button 
+            className="sidebar-toggle" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={20} />
+          </button>
+
           <div className="topbar-nav">
             <button
               className={`topbar-nav-item ${activeTopNav === 'todo' ? 'active' : ''}`}
@@ -696,12 +704,6 @@ function App() {
             >
               <ScrollText size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
               Journal
-            </button>
-          </div>
-
-          <div className="topbar-actions">
-            <button className="btn btn-secondary" style={{ padding: '8px 12px' }} onClick={() => setSidebarOpen(!sidebarOpen)}>
-              <Menu size={20} />
             </button>
           </div>
         </header>
