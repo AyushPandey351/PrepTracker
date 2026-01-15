@@ -4,19 +4,20 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "tabs")
+@Entity
+@Table(name = "tabs")
 public class Tab {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
     @NotBlank(message = "Tab name is required")
@@ -31,4 +32,3 @@ public class Tab {
     
     private Integer sortOrder;
 }
-

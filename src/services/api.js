@@ -1,4 +1,18 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+const getBaseUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // If we're accessing via IP (like on an iPad), use that same IP for the backend
+  const hostname = window.location.hostname;
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return `http://${hostname}:8080/api`;
+  }
+  
+  return 'http://localhost:8080/api';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 // Helper function for API calls
 async function fetchApi(endpoint, options = {}) {
@@ -79,6 +93,11 @@ export const subtopicsApi = {
   delete: (id) => fetchApi(`/subtopics/${id}`, {
     method: 'DELETE',
   }),
+  
+  reorder: (updates) => fetchApi('/subtopics/reorder', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  }),
 };
 
 // ============ ITEMS API ============
@@ -107,6 +126,11 @@ export const itemsApi = {
   
   delete: (id) => fetchApi(`/items/${id}`, {
     method: 'DELETE',
+  }),
+  
+  reorder: (updates) => fetchApi('/items/reorder', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
   }),
 };
 
@@ -176,6 +200,11 @@ export const activityApi = {
   
   getByTabId: (tabId) => fetchApi(`/activity/tab/${tabId}`),
   
+  create: (activity) => fetchApi('/activity', {
+    method: 'POST',
+    body: JSON.stringify(activity),
+  }),
+  
   delete: (id) => fetchApi(`/activity/${id}`, {
     method: 'DELETE',
   }),
@@ -195,6 +224,68 @@ export const cacheApi = {
   clear: (cacheName) => fetchApi(`/cache/${cacheName}`, { method: 'DELETE' }),
 };
 
+// ============ IMAGES API ============
+export const imagesApi = {
+  // Get image URL for display
+  getImageUrl: (fileName) => `${API_BASE_URL}/images/${fileName}`,
+  
+  // Get all images for an item
+  getByItemId: (itemId) => fetchApi(`/images/item/${itemId}`),
+  
+  // Upload single image
+  upload: async (file, itemId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('itemId', itemId);
+    
+    const url = `${API_BASE_URL}/images/upload`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `Upload failed: ${response.status}`);
+    }
+    
+    return response.json();
+  },
+  
+  // Upload multiple images
+  uploadMultiple: async (files, itemId) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    formData.append('itemId', itemId);
+    
+    const url = `${API_BASE_URL}/images/upload-multiple`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `Upload failed: ${response.status}`);
+    }
+    
+    return response.json();
+  },
+  
+  // Delete an image
+  delete: (imageId) => fetchApi(`/images/${imageId}`, {
+    method: 'DELETE',
+  }),
+};
+
+// ============ HEALTH API ============
+export const healthApi = {
+  ping: () => fetchApi('/ping'),
+  health: () => fetchApi('/health'),
+};
+
 // Named export for default
 const api = {
   tabs: tabsApi,
@@ -205,6 +296,8 @@ const api = {
   activity: activityApi,
   dashboard: dashboardApi,
   cache: cacheApi,
+  images: imagesApi,
+  health: healthApi,
 };
 
 export default api;

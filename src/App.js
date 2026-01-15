@@ -8,16 +8,47 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+import Editor from 'react-simple-code-editor';
+import Prism from 'prismjs';
+import 'prismjs/themes/prism-tomorrow.css';
+// Load Prism languages - order matters for dependencies
+import 'prismjs/components/prism-clike';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-sql';
 import {
   BookOpen, Code2, Database, Layers, Cpu, Plus, ChevronDown,
   Check, Trash2, Edit3, X, LayoutDashboard, CheckSquare, Briefcase,
   Menu, Bold, Italic, List, Link2, FileCode,
   Eye, PenTool, Sparkles, ScrollText, Zap,
-  Loader2, WifiOff, RefreshCw
+  Loader2, WifiOff, RefreshCw, Image, Upload, GripVertical,
+  Calendar, Flame, Activity
 } from 'lucide-react';
 
+// Drag and Drop
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 // Import API service
-import { tabsApi, subtopicsApi, itemsApi, checklistApi, applicationsApi, activityApi, dashboardApi } from './services/api';
+import { tabsApi, subtopicsApi, itemsApi, checklistApi, applicationsApi, activityApi, dashboardApi, imagesApi } from './services/api';
 
 // Animated Code Ninja Avatar Component
 function CodeAvatar() {
@@ -215,6 +246,7 @@ function App() {
   const [checklist, setChecklist] = useState([]);
   const [applications, setApplications] = useState([]);
   const [activityLog, setActivityLog] = useState([]);
+  const [habits, setHabits] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   
   const [activeTab, setActiveTab] = useState(null);
@@ -228,6 +260,12 @@ function App() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // DnD Sensors - must be at top level, not conditional
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   // Load initial data
   useEffect(() => {
@@ -249,6 +287,8 @@ function App() {
       loadApplications();
     } else if (activeTopNav === 'journal') {
       loadActivityLog();
+    } else if (activeTopNav === 'habits') {
+      loadHabits();
     } else if (activeTopNav === 'dashboard') {
       loadDashboardStats();
     }
@@ -423,6 +463,74 @@ function App() {
     }
   };
 
+  // Reorder subtopics
+  const handleReorderSubtopics = async (oldIndex, newIndex) => {
+    if (oldIndex === newIndex) return;
+    
+    const reordered = arrayMove(currentSubtopics, oldIndex, newIndex);
+    
+    // Optimistic update
+    setCurrentTabData(prev => ({
+      ...prev,
+      subtopics: reordered
+    }));
+    
+    // Save to backend
+    try {
+      const updates = reordered.map((subtopic, index) => ({
+        id: subtopic.id,
+        sortOrder: index
+      }));
+      await subtopicsApi.reorder(updates);
+    } catch (err) {
+      console.error('Failed to reorder subtopics:', err);
+      await loadTabData(activeTab); // Revert on error
+    }
+  };
+
+  // Reorder items within a subtopic or tab
+  const handleReorderItems = async (subtopicId, oldIndex, newIndex) => {
+    if (oldIndex === newIndex) return;
+    
+    // Find items to reorder
+    let itemsToReorder;
+    if (subtopicId) {
+      const subtopic = currentSubtopics.find(s => s.id === subtopicId);
+      itemsToReorder = subtopic?.items || [];
+    } else {
+      itemsToReorder = currentItems;
+    }
+    
+    const reordered = arrayMove(itemsToReorder, oldIndex, newIndex);
+    
+    // Optimistic update
+    if (subtopicId) {
+      setCurrentTabData(prev => ({
+        ...prev,
+        subtopics: prev.subtopics.map(s => 
+          s.id === subtopicId ? { ...s, items: reordered } : s
+        )
+      }));
+    } else {
+      setCurrentTabData(prev => ({
+        ...prev,
+        items: reordered
+      }));
+    }
+    
+    // Save to backend
+    try {
+      const updates = reordered.map((item, index) => ({
+        id: item.id,
+        sortOrder: index
+      }));
+      await itemsApi.reorder(updates);
+    } catch (err) {
+      console.error('Failed to reorder items:', err);
+      await loadTabData(activeTab); // Revert on error
+    }
+  };
+
   // Update item
   const updateItem = async (itemId, updates) => {
     try {
@@ -566,6 +674,74 @@ function App() {
       await loadApplications();
     } catch (err) {
       console.error('Failed to delete application:', err);
+    }
+  };
+
+  // Habit tracker functions
+  const loadHabits = () => {
+    const savedHabits = localStorage.getItem('preptracker_habits');
+    if (savedHabits) {
+      setHabits(JSON.parse(savedHabits));
+    }
+  };
+
+  const saveHabitsToStorage = (newHabits) => {
+    localStorage.setItem('preptracker_habits', JSON.stringify(newHabits));
+    setHabits(newHabits);
+  };
+
+  const addHabit = () => {
+    const name = prompt('Enter habit name:');
+    if (name && name.trim()) {
+      const newHabit = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        completedDates: [], // Array of YYYY-MM-DD strings
+        createdAt: new Date().toISOString()
+      };
+      saveHabitsToStorage([...habits, newHabit]);
+    }
+  };
+
+  const logHabitActivity = async (habitName, dateStr) => {
+    try {
+      await activityApi.create({
+        date: dateStr,
+        itemTitle: habitName,
+        type: 'HABIT_COMPLETED',
+        tabName: 'Habit Tracker',
+        tabColor: '#ff6b6b'
+      });
+      if (activeTopNav === 'journal') {
+        loadActivityLog();
+      }
+    } catch (err) {
+      console.error('Failed to log habit activity:', err);
+    }
+  };
+
+  const toggleHabitDate = (habitId, dateStr) => {
+    const updatedHabits = habits.map(habit => {
+      if (habit.id === habitId) {
+        const completedDates = [...habit.completedDates];
+        const index = completedDates.indexOf(dateStr);
+        if (index > -1) {
+          completedDates.splice(index, 1);
+        } else {
+          completedDates.push(dateStr);
+          logHabitActivity(habit.name, dateStr);
+        }
+        return { ...habit, completedDates };
+      }
+      return habit;
+    });
+    saveHabitsToStorage(updatedHabits);
+  };
+
+  const deleteHabit = (habitId) => {
+    if (window.confirm('Are you sure you want to delete this habit?')) {
+      const updatedHabits = habits.filter(h => h.id !== habitId);
+      saveHabitsToStorage(updatedHabits);
     }
   };
 
@@ -715,6 +891,13 @@ function App() {
               Application Tracker
             </button>
             <button
+              className={`topbar-nav-item ${activeTopNav === 'habits' ? 'active' : ''}`}
+              onClick={() => setActiveTopNav('habits')}
+            >
+              <Calendar size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              Habit Tracker
+            </button>
+            <button
               className={`topbar-nav-item ${activeTopNav === 'journal' ? 'active' : ''}`}
               onClick={() => setActiveTopNav('journal')}
             >
@@ -778,74 +961,105 @@ function App() {
 
                 {/* Topics with collapsible sections (for DSA-like tabs) */}
                 {isNestedTab ? (
-                  <div className="topics-container">
-                    {currentSubtopics.map((topic) => (
-                      <TopicSection
-                        key={topic.id}
-                        topic={topic}
-                        tabId={activeTab}
-                        isOpen={openSubtopics[topic.id]}
-                        openAccordions={openAccordions}
-                        editingItem={editingItem}
-                        progress={topic.progress || 0}
-                        onToggle={() => toggleSubtopic(topic.id)}
-                        onToggleAccordion={toggleAccordion}
-                        onToggleComplete={(itemId) => toggleItemComplete(itemId)}
-                        onUpdateItem={(itemId, updates) => updateItem(itemId, updates)}
-                        onDeleteItem={(itemId) => deleteItem(itemId)}
-                        onEditItem={(itemId) => setEditingItem(editingItem === itemId ? null : itemId)}
-                        onAddItem={() => addItem(activeTab, topic.id)}
-                        onDeleteTopic={() => deleteSubtopic(topic.id)}
-                      />
-                    ))}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => {
+                      const { active, over } = event;
+                      if (over && active.id !== over.id) {
+                        const oldIndex = currentSubtopics.findIndex(s => s.id === active.id);
+                        const newIndex = currentSubtopics.findIndex(s => s.id === over.id);
+                        handleReorderSubtopics(oldIndex, newIndex);
+                      }
+                    }}
+                  >
+                    <SortableContext items={currentSubtopics.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                      <div className="topics-container">
+                        {currentSubtopics.map((topic) => (
+                          <SortableTopicSection
+                            key={topic.id}
+                            topic={topic}
+                            tabId={activeTab}
+                            isOpen={openSubtopics[topic.id]}
+                            openAccordions={openAccordions}
+                            editingItem={editingItem}
+                            progress={topic.progress || 0}
+                            onToggle={() => toggleSubtopic(topic.id)}
+                            onToggleAccordion={toggleAccordion}
+                            onToggleComplete={(itemId) => toggleItemComplete(itemId)}
+                            onUpdateItem={(itemId, updates) => updateItem(itemId, updates)}
+                            onDeleteItem={(itemId) => deleteItem(itemId)}
+                            onEditItem={(itemId) => setEditingItem(editingItem === itemId ? null : itemId)}
+                            onAddItem={() => addItem(activeTab, topic.id)}
+                            onDeleteTopic={() => deleteSubtopic(topic.id)}
+                            onReorderItems={handleReorderItems}
+                          />
+                        ))}
 
-                    {currentSubtopics.length === 0 && (
-                      <div className="empty-state">
-                        <div className="empty-state-icon">
-                          <Layers size={32} />
-                        </div>
-                        <h3 className="empty-state-title">No topics yet</h3>
-                        <p className="empty-state-text">Add topics to organize your questions</p>
+                        {currentSubtopics.length === 0 && (
+                          <div className="empty-state">
+                            <div className="empty-state-icon">
+                              <Layers size={32} />
+                            </div>
+                            <h3 className="empty-state-title">No topics yet</h3>
+                            <p className="empty-state-text">Add topics to organize your questions</p>
+                          </div>
+                        )}
+
+                        <button className="add-topic-btn" onClick={() => addSubtopic(activeTab)}>
+                          <Plus size={18} />
+                          Add Topic
+                        </button>
                       </div>
-                    )}
-
-                    <button className="add-topic-btn" onClick={() => addSubtopic(activeTab)}>
-                      <Plus size={18} />
-                      Add Topic
-                    </button>
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 ) : (
                   /* Regular Accordion List (for tabs without subtopics) */
-                  <div className="accordion-list">
-                    {currentItems.map((item) => (
-                      <AccordionItem
-                        key={item.id}
-                        item={item}
-                        isOpen={openAccordions[item.id]}
-                        isEditing={editingItem === item.id}
-                        onToggle={() => toggleAccordion(item.id)}
-                        onToggleComplete={() => toggleItemComplete(item.id)}
-                        onUpdate={(updates) => updateItem(item.id, updates)}
-                        onDelete={() => deleteItem(item.id)}
-                        onEdit={() => setEditingItem(editingItem === item.id ? null : item.id)}
-                      />
-                    ))}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => {
+                      const { active, over } = event;
+                      if (over && active.id !== over.id) {
+                        const oldIndex = currentItems.findIndex(i => i.id === active.id);
+                        const newIndex = currentItems.findIndex(i => i.id === over.id);
+                        handleReorderItems(null, oldIndex, newIndex);
+                      }
+                    }}
+                  >
+                    <SortableContext items={currentItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                      <div className="accordion-list">
+                        {currentItems.map((item) => (
+                          <SortableAccordionItem
+                            key={item.id}
+                            item={item}
+                            isOpen={openAccordions[item.id]}
+                            isEditing={editingItem === item.id}
+                            onToggle={() => toggleAccordion(item.id)}
+                            onToggleComplete={() => toggleItemComplete(item.id)}
+                            onUpdate={(updates) => updateItem(item.id, updates)}
+                            onDelete={() => deleteItem(item.id)}
+                            onEdit={() => setEditingItem(editingItem === item.id ? null : item.id)}
+                          />
+                        ))}
 
-                    {currentItems.length === 0 && (
-                      <div className="empty-state">
-                        <div className="empty-state-icon">
-                          <BookOpen size={32} />
-                        </div>
-                        <h3 className="empty-state-title">No topics yet</h3>
-                        <p className="empty-state-text">Start adding topics to track your progress</p>
+                        {currentItems.length === 0 && (
+                          <div className="empty-state">
+                            <div className="empty-state-icon">
+                              <BookOpen size={32} />
+                            </div>
+                            <h3 className="empty-state-title">No topics yet</h3>
+                            <p className="empty-state-text">Start adding topics to track your progress</p>
+                          </div>
+                        )}
+
+                        <button className="add-item-btn" onClick={() => addItem(activeTab)}>
+                          <Plus size={20} />
+                          Add New Topic
+                        </button>
                       </div>
-                    )}
-
-                    <button className="add-item-btn" onClick={() => addItem(activeTab)}>
-                      <Plus size={20} />
-                      Add New Topic
-                    </button>
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </motion.div>
             )}
@@ -1103,7 +1317,68 @@ function App() {
                   <p className="content-subtitle">Your daily learning timeline</p>
                 </div>
 
+                <ActivityHeatmap activities={activityLog} />
+
                 <JournalTimeline activityLog={activityLog} />
+              </motion.div>
+            )}
+
+            {/* Habit Tracker View */}
+            {activeTopNav === 'habits' && (
+              <motion.div
+                key="habits"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="content-header">
+                  <h1 className="content-title">
+                    <div className="content-title-icon" style={{ background: 'linear-gradient(135deg, #ff6b6b, #ff9f43)' }}>
+                      <Flame size={28} />
+                    </div>
+                    Habit Tracker
+                  </h1>
+                  <div className="flex-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <p className="content-subtitle">Track your daily consistency (Month Wise)</p>
+                    <button className="btn btn-primary" onClick={addHabit}>
+                      <Plus size={18} />
+                      Add Habit
+                    </button>
+                  </div>
+                </div>
+
+                <div className="habits-container">
+                  {habits.length > 0 ? (
+                    habits.map(habit => (
+                      <div key={habit.id} className="habit-card">
+                        <div className="habit-header">
+                          <h3 className="habit-name">{habit.name}</h3>
+                          <button className="delete-habit-btn" onClick={() => deleteHabit(habit.id)}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <div className="habit-grid-wrapper">
+                          <HabitYearHeatmap 
+                            habit={habit} 
+                            onToggle={(date) => toggleHabitDate(habit.id, date)} 
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <Flame size={32} />
+                      </div>
+                      <h3 className="empty-state-title">No habits tracked yet</h3>
+                      <p className="empty-state-text">Start by adding a habit like 'LeetCode Daily' or 'Reading'</p>
+                      <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={addHabit}>
+                        Add Your First Habit
+                      </button>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1325,6 +1600,31 @@ function App() {
 }
 
 // Collapsible Topic Section (for categories like DP, Graphs, Trees)
+// Sortable wrapper for TopicSection
+function SortableTopicSection(props) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.topic.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <TopicSection {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
+}
+
 function TopicSection({ 
   topic, 
   tabId, 
@@ -1339,8 +1639,16 @@ function TopicSection({
   onDeleteItem, 
   onEditItem,
   onAddItem,
-  onDeleteTopic
+  onDeleteTopic,
+  onReorderItems,
+  dragHandleProps = {}
 }) {
+  // DnD Sensors for items within this topic
+  const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   const chevronVariants = {
     collapsed: { rotate: -90 },
     expanded: { rotate: 0 }
@@ -1368,33 +1676,39 @@ function TopicSection({
   return (
     <div className={`topic-section ${isOpen ? 'open' : ''}`}>
       {/* Topic Header - Simple collapsible */}
-      <div className="topic-header" onClick={onToggle}>
+      <div className="topic-header">
+        {/* Drag Handle */}
+        <div className="drag-handle" {...dragHandleProps}>
+          <GripVertical size={16} />
+        </div>
+        
         <motion.div
           className="topic-chevron"
           variants={chevronVariants}
           initial="collapsed"
           animate={isOpen ? "expanded" : "collapsed"}
           transition={{ duration: 0.25, ease: "easeOut" }}
+          onClick={onToggle}
         >
           <ChevronDown size={18} />
         </motion.div>
         
-        <div className="topic-color-dot" style={{ background: topic.color }} />
+        <div className="topic-color-dot" style={{ background: topic.color }} onClick={onToggle} />
         
-        <span className="topic-name">{topic.name}</span>
+        <span className="topic-name" onClick={onToggle}>{topic.name}</span>
         
-        <span className="topic-badge">
+        <span className="topic-badge" onClick={onToggle}>
           {topic.items.filter(i => i.completed).length}/{topic.items.length}
         </span>
         
-        <div className="topic-progress-mini">
+        <div className="topic-progress-mini" onClick={onToggle}>
           <div 
             className="topic-progress-mini-fill" 
             style={{ width: `${progress}%`, background: topic.color }}
           />
         </div>
         
-        <div className="topic-actions" onClick={(e) => e.stopPropagation()}>
+        <div className="topic-actions">
           <button className="topic-action-btn" onClick={onAddItem} title="Add Question">
             <Plus size={14} />
           </button>
@@ -1414,37 +1728,46 @@ function TopicSection({
             animate="expanded"
             exit="collapsed"
           >
-            <div className="topic-questions">
-              {topic.items.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                >
-                  <AccordionItem
-                    item={item}
-                    isOpen={openAccordions[item.id]}
-                    isEditing={editingItem === item.id}
-                    onToggle={() => onToggleAccordion(item.id)}
-                    onToggleComplete={() => onToggleComplete(item.id)}
-                    onUpdate={(updates) => onUpdateItem(item.id, updates)}
-                    onDelete={() => onDeleteItem(item.id)}
-                    onEdit={() => onEditItem(item.id)}
-                    isNested={true}
-                  />
-                </motion.div>
-              ))}
+            <DndContext
+              sensors={itemSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => {
+                const { active, over } = event;
+                if (over && active.id !== over.id) {
+                  const oldIndex = topic.items.findIndex(i => i.id === active.id);
+                  const newIndex = topic.items.findIndex(i => i.id === over.id);
+                  onReorderItems(topic.id, oldIndex, newIndex);
+                }
+              }}
+            >
+              <SortableContext items={topic.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                <div className="topic-questions">
+                  {topic.items.map((item, index) => (
+                    <SortableAccordionItem
+                      key={item.id}
+                      item={item}
+                      isOpen={openAccordions[item.id]}
+                      isEditing={editingItem === item.id}
+                      onToggle={() => onToggleAccordion(item.id)}
+                      onToggleComplete={() => onToggleComplete(item.id)}
+                      onUpdate={(updates) => onUpdateItem(item.id, updates)}
+                      onDelete={() => onDeleteItem(item.id)}
+                      onEdit={() => onEditItem(item.id)}
+                      isNested={true}
+                    />
+                  ))}
 
-              {topic.items.length === 0 && (
-                <div className="empty-questions">
-                  <span>No questions yet</span>
-                  <button className="add-first-btn" onClick={onAddItem}>
-                    <Plus size={14} /> Add first question
-                  </button>
+                  {topic.items.length === 0 && (
+                    <div className="empty-questions">
+                      <span>No questions yet</span>
+                      <button className="add-first-btn" onClick={onAddItem}>
+                        <Plus size={14} /> Add first question
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </SortableContext>
+            </DndContext>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1452,13 +1775,45 @@ function TopicSection({
   );
 }
 
+// Sortable wrapper for AccordionItem
+function SortableAccordionItem(props) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <AccordionItem {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
+}
+
 // Accordion Item Component (for individual questions)
-function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, onUpdate, onDelete, onEdit, isNested = false }) {
+function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, onUpdate, onDelete, onEdit, isNested = false, dragHandleProps = {} }) {
   const [content, setContent] = useState(item.content);
   const [code, setCode] = useState(item.code);
   const [codeLanguage, setCodeLanguage] = useState(item.codeLanguage);
   const [title, setTitle] = useState(item.title);
   const [showPreview, setShowPreview] = useState(false);
+  const [images, setImages] = useState([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [showImages, setShowImages] = useState(false);
+  const [showCode, setShowCode] = useState(!!item.code); // Show if there's existing code
+  const textareaRef = React.useRef(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   useEffect(() => {
     setContent(item.content);
@@ -1466,6 +1821,135 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
     setCodeLanguage(item.codeLanguage);
     setTitle(item.title);
   }, [item]);
+
+  // Load images when image section is shown
+  useEffect(() => {
+    if (isOpen && item.id && showImages) {
+      loadImages();
+    }
+  }, [isOpen, item.id, showImages]);
+
+  // Show images section if there are existing images
+  useEffect(() => {
+    if (isOpen && item.id) {
+      imagesApi.getByItemId(item.id).then(imgs => {
+        if (imgs && imgs.length > 0) {
+          setImages(imgs);
+          setShowImages(true);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, item.id]);
+
+  const loadImages = async () => {
+    try {
+      const imgs = await imagesApi.getByItemId(item.id);
+      setImages(imgs);
+    } catch (err) {
+      console.error('Failed to load images:', err);
+    }
+  };
+
+  const handleImageUpload = async (files, embedInNote = true) => {
+    if (!files || files.length === 0) return;
+    
+    setUploadingImage(true);
+    try {
+      const uploadedImages = [];
+      for (const file of files) {
+        const uploaded = await imagesApi.upload(file, item.id);
+        uploadedImages.push(uploaded);
+      }
+      await loadImages();
+      
+      // Embed images in the note at cursor position
+      if (embedInNote && uploadedImages.length > 0) {
+        const markdownImages = uploadedImages
+          .map(img => `![${img.originalFileName}](${imagesApi.getImageUrl(img.fileName)})`)
+          .join('\n');
+        
+        // Insert at cursor position
+        const pos = cursorPosition || content.length;
+        const before = content.substring(0, pos);
+        const after = content.substring(pos);
+        const newContent = before + (before.endsWith('\n') || before === '' ? '' : '\n') + markdownImages + '\n' + after;
+        
+        setContent(newContent);
+        // Auto-save after embedding
+        setTimeout(() => {
+          onUpdate({ content: newContent });
+        }, 100);
+      }
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Insert an existing image from gallery into the note
+  const insertImageInNote = (img) => {
+    const markdown = `![${img.originalFileName}](${imagesApi.getImageUrl(img.fileName)})`;
+    const pos = cursorPosition || content.length;
+    const before = content.substring(0, pos);
+    const after = content.substring(pos);
+    const newContent = before + (before.endsWith('\n') || before === '' ? '' : '\n') + markdown + '\n' + after;
+    
+    setContent(newContent);
+    // Auto-save after embedding
+    setTimeout(() => {
+      onUpdate({ content: newContent });
+    }, 100);
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    try {
+      await imagesApi.delete(imageId);
+      await loadImages();
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+    }
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    const files = Array.from(e.dataTransfer.files).filter(
+      file => file.type.startsWith('image/')
+    );
+    if (files.length > 0) {
+      handleImageUpload(files);
+    }
+  };
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    const imageFiles = [];
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    
+    if (imageFiles.length > 0) {
+      handleImageUpload(imageFiles);
+    }
+  };
 
   const handleSave = () => {
     onUpdate({ content, code, codeLanguage, title });
@@ -1519,6 +2003,11 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
       layout="position"
     >
       <div className="accordion-header">
+        {/* Drag Handle */}
+        <div className="drag-handle" {...dragHandleProps}>
+          <GripVertical size={14} />
+        </div>
+        
         <label className="accordion-checkbox" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -1629,6 +2118,21 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
                   <button className="editor-btn" onClick={() => setContent(content + '[link](url)')} title="Link">
                     <Link2 size={16} />
                   </button>
+                  <div className="editor-divider" />
+                  <button 
+                    className={`editor-btn ${showImages ? 'active' : ''}`} 
+                    onClick={() => setShowImages(!showImages)} 
+                    title="Toggle Images"
+                  >
+                    <Image size={16} />
+                  </button>
+                  <button 
+                    className={`editor-btn ${showCode ? 'active' : ''}`} 
+                    onClick={() => setShowCode(!showCode)} 
+                    title="Toggle Code Snippet"
+                  >
+                    <FileCode size={16} />
+                  </button>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -1669,10 +2173,14 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
                   ) : (
                     <motion.textarea
                       key="editor"
+                      ref={textareaRef}
                       className="editor-textarea"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       onBlur={handleSave}
+                      onSelect={(e) => setCursorPosition(e.target.selectionStart)}
+                      onClick={(e) => setCursorPosition(e.target.selectionStart)}
+                      onKeyUp={(e) => setCursorPosition(e.target.selectionStart)}
                       placeholder="Write your notes in markdown..."
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -1683,43 +2191,178 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
                 </AnimatePresence>
               </div>
 
-              {/* Code Block */}
-              <motion.div 
-                className="code-block-container"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.3 }}
-              >
-                <div className="code-block-header">
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    <FileCode size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-                    Code Snippet
-                  </span>
-                  <select
-                    className="code-language-select"
-                    value={codeLanguage}
-                    onChange={(e) => {
-                      setCodeLanguage(e.target.value);
-                      onUpdate({ codeLanguage: e.target.value });
-                    }}
+              {/* Image Upload Section - Toggle */}
+              <AnimatePresence>
+                {showImages && (
+                  <motion.div 
+                    className="image-upload-container"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    onPaste={handlePaste}
                   >
-                    <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
-                    <option value="python">Python</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="cpp">C++</option>
-                    <option value="sql">SQL</option>
-                  </select>
-                </div>
-                <textarea
-                  className="code-editor"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  onBlur={handleSave}
-                  placeholder="// Add your code here..."
-                  spellCheck={false}
-                />
-              </motion.div>
+                    <div className="image-upload-header">
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        <Image size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                        Images & GIFs
+                      </span>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <label className="image-upload-btn">
+                          <Upload size={14} />
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleImageUpload(Array.from(e.target.files))}
+                          />
+                        </label>
+                        <button 
+                          className="section-close-btn"
+                          onClick={() => setShowImages(false)}
+                          title="Hide images section"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Drop Zone */}
+                    <div 
+                      className={`image-drop-zone ${dragActive ? 'active' : ''} ${uploadingImage ? 'uploading' : ''}`}
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                    >
+                      {uploadingImage ? (
+                        <div className="upload-progress">
+                          <Loader2 className="spinning" size={24} />
+                          <span>Uploading...</span>
+                        </div>
+                      ) : images.length === 0 ? (
+                        <div className="drop-zone-placeholder">
+                          <Image size={32} style={{ opacity: 0.5 }} />
+                          <p>Drag & drop images here, or paste from clipboard</p>
+                          <span className="drop-hint">Supports PNG, JPG, GIF, WebP</span>
+                        </div>
+                      ) : (
+                        <div className="image-gallery">
+                          {images.map((img) => (
+                            <div key={img.id} className="image-item">
+                              <img 
+                                src={imagesApi.getImageUrl(img.fileName)} 
+                                alt={img.originalFileName}
+                                loading="lazy"
+                              />
+                              <div className="image-overlay">
+                                <span className="image-name">{img.originalFileName}</span>
+                                <div className="image-actions">
+                                  <button 
+                                    className="image-insert-btn"
+                                    onClick={() => insertImageInNote(img)}
+                                    title="Insert in note"
+                                  >
+                                    <Plus size={14} />
+                                  </button>
+                                  <button 
+                                    className="image-delete-btn"
+                                    onClick={() => handleDeleteImage(img.id)}
+                                    title="Delete image"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Add more button */}
+                          <label className="image-add-more">
+                            <Plus size={24} />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleImageUpload(Array.from(e.target.files))}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Code Block - Toggle */}
+              <AnimatePresence>
+                {showCode && (
+                  <motion.div 
+                    className="code-block-container"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <div className="code-block-header">
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        <FileCode size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                        Code Snippet
+                      </span>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select
+                          className="code-language-select"
+                          value={codeLanguage}
+                          onChange={(e) => {
+                            setCodeLanguage(e.target.value);
+                            onUpdate({ codeLanguage: e.target.value });
+                          }}
+                        >
+                          <option value="javascript">JavaScript</option>
+                          <option value="java">Java</option>
+                          <option value="python">Python</option>
+                          <option value="typescript">TypeScript</option>
+                          <option value="cpp">C++</option>
+                          <option value="sql">SQL</option>
+                        </select>
+                        <button 
+                          className="section-close-btn"
+                          onClick={() => setShowCode(false)}
+                          title="Hide code section"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <Editor
+                      value={code || ''}
+                      onValueChange={(newCode) => setCode(newCode)}
+                      onBlur={handleSave}
+                      highlight={(code) => {
+                        const lang = codeLanguage === 'cpp' ? 'cpp' : codeLanguage;
+                        if (Prism.languages[lang]) {
+                          return Prism.highlight(code || '', Prism.languages[lang], lang);
+                        }
+                        return code || '';
+                      }}
+                      padding={14}
+                      placeholder="// Add your code here..."
+                      className="code-editor-container"
+                      textareaClassName="code-editor-textarea"
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: '0.85rem',
+                        lineHeight: '1.7',
+                        minHeight: '600px',
+                        background: '#030508',
+                        borderRadius: '0 0 10px 10px',
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
@@ -1962,6 +2605,313 @@ function ChecklistItem({ item, onToggle, onUpdate, onDelete }) {
         </button>
       </div>
     </motion.div>
+  );
+}
+
+// Activity Heatmap Component (Reusable for Journal)
+function ActivityHeatmap({ activities }) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  
+  const localFormatDate = (d) => {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Extract unique dates from activities
+  const completedDatesSet = new Set(activities.map(a => a.date));
+  const totalActiveDays = completedDatesSet.size;
+  
+  // Calculate streaks
+  let maxStreak = 0;
+  let currentStreak = 0;
+  let tempStreak = 0;
+  
+  if (completedDatesSet.size > 0) {
+    for (let i = 0; i < 365; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() - (364 - i));
+      const dateStr = localFormatDate(d);
+      if (completedDatesSet.has(dateStr)) {
+        tempStreak++;
+        maxStreak = Math.max(maxStreak, tempStreak);
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    let checkDate = new Date();
+    while (true) {
+      const dateStr = localFormatDate(checkDate);
+      if (completedDatesSet.has(dateStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        if (currentStreak === 0) {
+           const yesterday = new Date();
+           yesterday.setDate(yesterday.getDate() - 1);
+           const yestStr = localFormatDate(yesterday);
+           if (completedDatesSet.has(yestStr)) {
+             checkDate = yesterday;
+             continue;
+           }
+        }
+        break;
+      }
+    }
+  }
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Group weeks by month for the last 12 months
+  const monthsData = [];
+  const currentMonthIdx = today.getMonth();
+  const currentYearVal = today.getFullYear();
+
+  for (let i = 11; i >= 0; i--) {
+    let m = currentMonthIdx - i;
+    let y = currentYearVal;
+    if (m < 0) {
+      m += 12;
+      y -= 1;
+    }
+    
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    const weeks = [];
+    let currentWeek = Array(firstDay.getDay()).fill(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+      currentWeek.push(new Date(y, m, d));
+    }
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) currentWeek.push(null);
+      weeks.push(currentWeek);
+    }
+    monthsData.push({ name: monthNames[m], weeks });
+  }
+
+  const todayStr = localFormatDate(today);
+
+  return (
+    <div className="habit-heatmap-container" style={{ marginBottom: '30px' }}>
+      <div className="heatmap-header-row">
+        <div className="submissions-count">
+          <span className="count-big">{activities.length}</span> 
+          <span className="count-label">activities in the past year</span>
+        </div>
+        <div className="heatmap-summary-stats">
+          <div className="summary-stat">
+            <span className="summary-label">Total active days:</span>
+            <span className="summary-value">{totalActiveDays}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-label">Max streak:</span>
+            <span className="summary-value">{maxStreak}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-label">Current:</span>
+            <span className="summary-value">{currentStreak}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="heatmap-main-area-segmented">
+        <div className="heatmap-grid-segmented">
+          {monthsData.map((month, mIdx) => (
+            <div key={mIdx} className="month-block">
+              <div className="month-weeks">
+                {month.weeks.map((week, wIdx) => (
+                  <div key={wIdx} className="heatmap-column">
+                    {week.map((date, dIdx) => {
+                      const dateStr = localFormatDate(date);
+                      const isCompleted = dateStr && completedDatesSet.has(dateStr);
+                      const isToday = dateStr === todayStr;
+                      
+                      return (
+                        <div 
+                          key={dIdx}
+                          className={`heatmap-cell ${isCompleted ? 'active' : ''} ${isToday ? 'today' : ''} ${!date ? 'empty' : ''}`}
+                          style={isCompleted ? { background: 'var(--accent-primary)' } : {}}
+                          title={date ? `${date.toDateString()}${isCompleted ? ' (Active)' : ''}` : ''}
+                        ></div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <div className="month-label-bottom">{month.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Habit Tracker Heatmap Component (LeetCode style)
+function HabitYearHeatmap({ habit, onToggle }) {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  
+  const localFormatDate = (d) => {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Calculate stats
+  const completedDatesSet = new Set(habit.completedDates || []);
+  const totalActiveDays = completedDatesSet.size;
+  
+  // Calculate streaks
+  let maxStreak = 0;
+  let currentStreak = 0;
+  let tempStreak = 0;
+  
+  if (completedDatesSet.size > 0) {
+    // Max streak in last 365 days
+    for (let i = 0; i < 365; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() - (364 - i));
+      const dateStr = localFormatDate(d);
+      if (completedDatesSet.has(dateStr)) {
+        tempStreak++;
+        maxStreak = Math.max(maxStreak, tempStreak);
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    // Current streak
+    let checkDate = new Date();
+    while (true) {
+      const dateStr = localFormatDate(checkDate);
+      if (completedDatesSet.has(dateStr)) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        if (currentStreak === 0) {
+           const yesterday = new Date();
+           yesterday.setDate(yesterday.getDate() - 1);
+           const yestStr = localFormatDate(yesterday);
+           if (completedDatesSet.has(yestStr)) {
+             checkDate = yesterday;
+             continue;
+           }
+        }
+        break;
+      }
+    }
+  }
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Group weeks by month for the last 12 months
+  const monthsData = [];
+  const currentMonthIdx = today.getMonth();
+  const currentYearVal = today.getFullYear();
+
+  for (let i = 11; i >= 0; i--) {
+    let m = currentMonthIdx - i;
+    let y = currentYearVal;
+    if (m < 0) {
+      m += 12;
+      y -= 1;
+    }
+    
+    const firstDay = new Date(y, m, 1);
+    const lastDay = new Date(y, m + 1, 0);
+    const weeks = [];
+    let currentWeek = Array(firstDay.getDay()).fill(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+      currentWeek.push(new Date(y, m, d));
+    }
+    if (currentWeek.length > 0) {
+      while (currentWeek.length < 7) currentWeek.push(null);
+      weeks.push(currentWeek);
+    }
+    monthsData.push({ name: monthNames[m], weeks });
+  }
+
+  const todayStr = localFormatDate(today);
+
+  return (
+    <div className="habit-heatmap-container">
+      <div className="heatmap-header-row">
+        <div className="submissions-count">
+          <span className="count-big">{totalActiveDays}</span> 
+          <span className="count-label">submissions in the past one year</span>
+        </div>
+        <div className="heatmap-summary-stats">
+          <div className="summary-stat">
+            <span className="summary-label">Total active days:</span>
+            <span className="summary-value">{totalActiveDays}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-label">Max streak:</span>
+            <span className="summary-value">{maxStreak}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-label">Current:</span>
+            <span className="summary-value">{currentStreak}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="heatmap-main-area-segmented">
+        <div className="heatmap-grid-segmented">
+          {monthsData.map((month, mIdx) => (
+            <div key={mIdx} className="month-block">
+              <div className="month-weeks">
+                {month.weeks.map((week, wIdx) => (
+                  <div key={wIdx} className="heatmap-column">
+                    {week.map((date, dIdx) => {
+                      const dateStr = localFormatDate(date);
+                      const isCompleted = dateStr && completedDatesSet.has(dateStr);
+                      const isToday = dateStr === todayStr;
+                      
+                      return (
+                        <div 
+                          key={dIdx}
+                          className={`heatmap-cell ${isCompleted ? 'active' : ''} ${isToday ? 'today' : ''} ${!date ? 'empty' : ''}`}
+                          title={date ? `${date.toDateString()}${isCompleted ? ' (Completed)' : ''}` : ''}
+                          onClick={() => date && onToggle(dateStr)}
+                        ></div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <div className="month-label-bottom">{month.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="heatmap-footer-simple">
+        <div className="heatmap-legend">
+          <span>Less</span>
+          <div className="legend-cells">
+            <div className="legend-cell empty"></div>
+            <div className="legend-cell active"></div>
+          </div>
+          <span>More</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

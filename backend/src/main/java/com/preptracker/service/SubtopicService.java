@@ -1,6 +1,7 @@
 package com.preptracker.service;
 
 import com.preptracker.config.CacheConfig;
+import com.preptracker.dto.ReorderRequest;
 import com.preptracker.dto.SubtopicWithItems;
 import com.preptracker.model.Item;
 import com.preptracker.model.Subtopic;
@@ -112,5 +113,20 @@ public class SubtopicService {
         long total = itemRepository.countBySubtopicId(subtopicId);
         long completed = itemRepository.countBySubtopicIdAndCompletedTrue(subtopicId);
         return total > 0 ? (int) (completed * 100 / total) : 0;
+    }
+    
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheConfig.SUBTOPICS_CACHE, allEntries = true),
+            @CacheEvict(value = CacheConfig.TAB_DATA_CACHE, allEntries = true)
+    })
+    public void reorderSubtopics(List<ReorderRequest> updates) {
+        log.debug("Reordering {} subtopics", updates.size());
+        for (ReorderRequest update : updates) {
+            subtopicRepository.findById(update.getId()).ifPresent(subtopic -> {
+                subtopic.setSortOrder(update.getSortOrder());
+                subtopicRepository.save(subtopic);
+            });
+        }
     }
 }

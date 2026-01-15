@@ -27,10 +27,17 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         
-        <!-- Spring Boot MongoDB -->
+        <!-- Spring Boot JPA (for H2) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        
+        <!-- H2 Database -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
         </dependency>
         
         <!-- Spring Boot Validation -->
@@ -45,13 +52,7 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
         
-        <!-- Redis for Caching -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-        
-        <!-- Caffeine Cache (in-memory fallback) -->
+        <!-- Caffeine Cache (in-memory) -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
@@ -97,4 +98,3 @@
         </plugins>
     </build>
 </project>
-

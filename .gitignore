@@ -96,6 +96,18 @@ $RECYCLE.BIN/
 apache-maven-*/
 maven.zip
 
+# H2 Database files
+backend/data/
+**/data/*.db
+**/data/*.mv.db
+**/data/*.trace.db
+*.mv.db
+*.trace.db
+
+# Uploaded images
+backend/uploads/
+**/uploads/
+
 # Logs
 *.log
 logs/

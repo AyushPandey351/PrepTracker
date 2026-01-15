@@ -41,6 +41,11 @@ public class ActivityLogController {
         return ResponseEntity.ok(activityLogService.getActivityLogsByTabId(tabId));
     }
     
+    @PostMapping
+    public ResponseEntity<ActivityLog> createActivityLog(@RequestBody ActivityLog activityLog) {
+        return ResponseEntity.ok(activityLogService.createActivityLog(activityLog));
+    }
+    
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteActivityLog(@PathVariable String id) {
         activityLogService.deleteActivityLog(id);

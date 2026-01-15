@@ -4,20 +4,22 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.index.Indexed;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "subtopics")
+@Entity
+@Table(name = "subtopics", indexes = {
+    @Index(name = "idx_subtopic_tab", columnList = "tabId")
+})
 public class Subtopic {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
     @NotBlank(message = "Subtopic name is required")
@@ -25,10 +27,8 @@ public class Subtopic {
     
     private String color;
     
-    @Indexed
     @NotBlank(message = "Tab ID is required")
     private String tabId;
     
     private Integer sortOrder;
 }
-

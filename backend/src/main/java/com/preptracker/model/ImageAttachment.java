@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @Data
@@ -14,22 +13,27 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "checklist_items")
-public class ChecklistItem {
+@Table(name = "image_attachments", indexes = {
+    @Index(name = "idx_image_item", columnList = "itemId")
+})
+public class ImageAttachment {
     
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
-    @NotBlank(message = "Text is required")
-    private String text;
+    private String itemId;
     
-    @Builder.Default
-    private Boolean completed = false;
+    private String fileName;
     
-    private Integer sortOrder;
+    private String originalFileName;
     
-    private LocalDateTime createdAt;
+    private String contentType;
     
-    private LocalDateTime completedAt;
+    private Long fileSize;
+    
+    private String filePath;
+    
+    private LocalDateTime uploadedAt;
 }
+

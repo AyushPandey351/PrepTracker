@@ -1,5 +1,6 @@
 package com.preptracker.controller;
 
+import com.preptracker.dto.ReorderRequest;
 import com.preptracker.model.Item;
 import com.preptracker.service.ItemService;
 import jakarta.validation.Valid;
@@ -23,11 +24,6 @@ public class ItemController {
         return ResponseEntity.ok(itemService.getAllItems());
     }
     
-    @GetMapping("/{id}")
-    public ResponseEntity<Item> getItemById(@PathVariable String id) {
-        return ResponseEntity.ok(itemService.getItemById(id));
-    }
-    
     @GetMapping("/tab/{tabId}")
     public ResponseEntity<List<Item>> getItemsByTabId(@PathVariable String tabId) {
         return ResponseEntity.ok(itemService.getItemsByTabId(tabId));
@@ -36,6 +32,18 @@ public class ItemController {
     @GetMapping("/subtopic/{subtopicId}")
     public ResponseEntity<List<Item>> getItemsBySubtopicId(@PathVariable String subtopicId) {
         return ResponseEntity.ok(itemService.getItemsBySubtopicId(subtopicId));
+    }
+    
+    // Reorder must come BEFORE /{id} to avoid path variable matching "reorder"
+    @PutMapping("/reorder")
+    public ResponseEntity<Void> reorderItems(@RequestBody List<ReorderRequest> updates) {
+        itemService.reorderItems(updates);
+        return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Item> getItemById(@PathVariable String id) {
+        return ResponseEntity.ok(itemService.getItemById(id));
     }
     
     @PostMapping
@@ -60,4 +68,3 @@ public class ItemController {
         return ResponseEntity.noContent().build();
     }
 }
-

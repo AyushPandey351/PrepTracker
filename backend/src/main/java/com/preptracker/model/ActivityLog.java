@@ -4,10 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.index.Indexed;
 
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -15,13 +13,16 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "activity_logs")
+@Entity
+@Table(name = "activity_logs", indexes = {
+    @Index(name = "idx_activity_date", columnList = "date")
+})
 public class ActivityLog {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
-    @Indexed
     private LocalDate date;
     
     private LocalDateTime timestamp;
@@ -41,14 +42,15 @@ public class ActivityLog {
     private String itemTitle;
     
     @Builder.Default
+    @Enumerated(EnumType.STRING)
     private ActivityType type = ActivityType.TOPIC_COMPLETED;
     
     public enum ActivityType {
         TOPIC_COMPLETED,
         ITEM_ADDED,
         CHECKLIST_COMPLETED,
+        HABIT_COMPLETED,
         APPLICATION_ADDED,
         APPLICATION_STATUS_CHANGED
     }
 }
-

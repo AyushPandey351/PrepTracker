@@ -1,14 +1,16 @@
 package com.preptracker.repository;
 
 import com.preptracker.model.ActivityLog;
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface ActivityLogRepository extends MongoRepository<ActivityLog, String> {
+public interface ActivityLogRepository extends JpaRepository<ActivityLog, String> {
     
     List<ActivityLog> findAllByOrderByTimestampDesc();
     
@@ -20,6 +22,7 @@ public interface ActivityLogRepository extends MongoRepository<ActivityLog, Stri
     
     long countByDate(LocalDate date);
     
+    @Modifying
+    @Transactional
     void deleteByItemId(String itemId);
 }
-

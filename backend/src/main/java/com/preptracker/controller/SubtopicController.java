@@ -1,5 +1,6 @@
 package com.preptracker.controller;
 
+import com.preptracker.dto.ReorderRequest;
 import com.preptracker.dto.SubtopicWithItems;
 import com.preptracker.model.Subtopic;
 import com.preptracker.service.SubtopicService;
@@ -27,6 +28,13 @@ public class SubtopicController {
     @GetMapping("/tab/{tabId}/with-items")
     public ResponseEntity<List<SubtopicWithItems>> getSubtopicsWithItemsByTabId(@PathVariable String tabId) {
         return ResponseEntity.ok(subtopicService.getSubtopicsWithItemsByTabId(tabId));
+    }
+    
+    // Reorder must come BEFORE /{id} to avoid path variable matching "reorder"
+    @PutMapping("/reorder")
+    public ResponseEntity<Void> reorderSubtopics(@RequestBody List<ReorderRequest> updates) {
+        subtopicService.reorderSubtopics(updates);
+        return ResponseEntity.ok().build();
     }
     
     @GetMapping("/{id}")
@@ -61,4 +69,3 @@ public class SubtopicController {
         return ResponseEntity.noContent().build();
     }
 }
-

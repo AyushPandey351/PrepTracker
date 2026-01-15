@@ -35,33 +35,91 @@ A beautiful, modern preparation tracker to help you track learning progress acro
 
 ## Tech Stack
 
+### Frontend
 - **React 18** - UI Framework
 - **Framer Motion** - Animations
 - **Recharts** - Charts & visualizations
 - **React Markdown** - Markdown rendering
 - **React Syntax Highlighter** - Code syntax highlighting
 - **Lucide React** - Beautiful icons
-- **LocalStorage** - Data persistence
+
+### Backend
+- **Spring Boot 3.2.0** - Java backend framework
+- **H2 Database** - File-based database for data persistence
+- **Spring Data JPA** - Database access layer
+- **Maven** - Build tool and dependency management
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
+- **Node.js** (v14 or higher)
+- **npm** or yarn
+- **Java 17+** (for backend)
+- **Maven 3.6+** (for backend)
 
 ### Installation
 
-1. Install dependencies:
+1. Install frontend dependencies:
 ```bash
 npm install
 ```
 
-2. Start the development server:
+2. The backend uses Maven and will download dependencies automatically when you run it.
+
+## Running the Application
+
+### Frontend (React)
+
+Start the React development server:
 ```bash
 npm start
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+The frontend will run on **http://localhost:3000**
+
+### Backend (Spring Boot)
+
+**Option 1: Using Maven (Recommended for development)**
+```bash
+cd backend
+C:\Users\ayush\OneDrive\Desktop\Tracker\apache-maven-3.9.6\bin\mvn.cmd spring-boot:run
+```
+
+**Option 2: Using the JAR file (After building)**
+```bash
+cd backend
+java -jar target\prep-tracker-backend-1.0.0.jar
+```
+
+The backend will run on **http://localhost:8080**
+
+### Running Both Services
+
+Open **two separate terminal windows**:
+
+**Terminal 1 - Frontend:**
+```bash
+npm start
+```
+
+**Terminal 2 - Backend:**
+```bash
+cd backend
+C:\Users\ayush\OneDrive\Desktop\Tracker\apache-maven-3.9.6\bin\mvn.cmd spring-boot:run
+```
+
+### Building the Backend
+
+If you need to build the backend JAR file first:
+```bash
+cd backend
+C:\Users\ayush\OneDrive\Desktop\Tracker\apache-maven-3.9.6\bin\mvn.cmd clean package -DskipTests
+```
+
+Then run the JAR:
+```bash
+java -jar target\prep-tracker-backend-1.0.0.jar
+```
 
 ## Usage
 
@@ -89,7 +147,9 @@ npm start
 
 ## Data Persistence
 
-All data is automatically saved to LocalStorage, so your progress persists between sessions.
+The application uses an **H2 file-based database** stored at `backend/data/preptracker.mv.db`. All your data (tabs, items, checklist, applications) is automatically persisted and will be available between sessions.
+
+You can access the H2 database console at **http://localhost:8080/h2-console** when the backend is running.
 
 ## License
 

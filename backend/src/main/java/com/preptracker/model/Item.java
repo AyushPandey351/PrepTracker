@@ -4,10 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.index.Indexed;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
@@ -15,10 +13,15 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "items")
+@Entity
+@Table(name = "items", indexes = {
+    @Index(name = "idx_item_tab", columnList = "tabId"),
+    @Index(name = "idx_item_subtopic", columnList = "subtopicId")
+})
 public class Item {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
     @NotBlank(message = "Item title is required")
@@ -27,17 +30,17 @@ public class Item {
     @Builder.Default
     private Boolean completed = false;
     
+    @Column(columnDefinition = "TEXT")
     private String content;
     
+    @Column(columnDefinition = "TEXT")
     private String code;
     
     @Builder.Default
     private String codeLanguage = "javascript";
     
-    @Indexed
     private String tabId;
     
-    @Indexed
     private String subtopicId;
     
     private Integer sortOrder;
@@ -47,5 +50,8 @@ public class Item {
     private LocalDateTime updatedAt;
     
     private LocalDateTime completedAt;
+    
+    // Image paths stored as comma-separated values
+    @Column(columnDefinition = "TEXT")
+    private String images;
 }
-

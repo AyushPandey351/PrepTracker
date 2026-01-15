@@ -1,6 +1,7 @@
 package com.preptracker.service;
 
 import com.preptracker.config.CacheConfig;
+import com.preptracker.dto.ReorderRequest;
 import com.preptracker.model.ActivityLog;
 import com.preptracker.model.Item;
 import com.preptracker.model.Subtopic;
@@ -179,5 +180,21 @@ public class ItemService {
         activityLogRepository.deleteByItemId(id);
         // Delete the item
         itemRepository.deleteById(id);
+    }
+    
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheConfig.ITEMS_CACHE, allEntries = true),
+            @CacheEvict(value = CacheConfig.TAB_DATA_CACHE, allEntries = true),
+            @CacheEvict(value = CacheConfig.SUBTOPICS_CACHE, allEntries = true)
+    })
+    public void reorderItems(List<ReorderRequest> updates) {
+        log.debug("Reordering {} items", updates.size());
+        for (ReorderRequest update : updates) {
+            itemRepository.findById(update.getId()).ifPresent(item -> {
+                item.setSortOrder(update.getSortOrder());
+                itemRepository.save(item);
+            });
+        }
     }
 }
