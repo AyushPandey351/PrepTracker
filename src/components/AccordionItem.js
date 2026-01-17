@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -49,12 +49,21 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
     setTitle(item.title);
   }, [item]);
 
+  const loadImages = useCallback(async () => {
+    try {
+      const imgs = await imagesApi.getByItemId(item.id);
+      setImages(imgs);
+    } catch (err) {
+      console.error('Failed to load images:', err);
+    }
+  }, [item.id]);
+
   // Load images when image section is shown
   useEffect(() => {
     if (isOpen && item.id && showImages) {
       loadImages();
     }
-  }, [isOpen, item.id, showImages]);
+  }, [isOpen, item.id, showImages, loadImages]);
 
   // Show images section if there are existing images
   useEffect(() => {
@@ -66,15 +75,6 @@ function AccordionItem({ item, isOpen, isEditing, onToggle, onToggleComplete, on
       }).catch(() => {});
     }
   }, [isOpen, item.id]);
-
-  const loadImages = async () => {
-    try {
-      const imgs = await imagesApi.getByItemId(item.id);
-      setImages(imgs);
-    } catch (err) {
-      console.error('Failed to load images:', err);
-    }
-  };
 
   const handleImageUpload = async (files, embedInNote = true) => {
     if (!files || files.length === 0) return;

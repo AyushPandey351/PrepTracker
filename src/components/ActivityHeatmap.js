@@ -22,9 +22,6 @@ function ActivityHeatmap({ activities }) {
     return acc;
   }, {});
 
-  // Find max activity count for normalization
-  const maxActivityCount = Math.max(1, ...Object.values(activityCountsByDate));
-
   // Function to get color based on activity count
   const getCellColor = (count) => {
     if (count === 0) return 'transparent';

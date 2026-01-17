@@ -4,29 +4,24 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
-import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import remarkGfm from 'remark-gfm';
-import Editor from 'react-simple-code-editor';
-import Prism from 'prismjs';
-import 'prismjs/themes/prism-tomorrow.css';
-// Load Prism languages - order matters for dependencies
-import 'prismjs/components/prism-clike';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-sql';
 import {
-  BookOpen, Code2, Database, Layers, Cpu, Plus, ChevronDown,
-  Check, Trash2, Edit3, X, LayoutDashboard, CheckSquare, Briefcase,
-  Menu, Bold, Italic, List, Link2, FileCode,
-  Eye, PenTool, Sparkles, ScrollText, Zap,
-  Loader2, WifiOff, RefreshCw, Image, Upload, GripVertical,
-  Calendar, Flame, Activity
+  BookOpen,
+  Briefcase,
+  Calendar,
+  CheckSquare,
+  Code2,
+  Cpu,
+  Database,
+  Edit3,
+  FileCode,
+  Layers,
+  LayoutDashboard,
+  Menu,
+  Plus,
+  ScrollText,
+  Sparkles,
+  Trash2,
+  X
 } from 'lucide-react';
 
 // Drag and Drop
@@ -46,7 +41,7 @@ import {
 } from '@dnd-kit/sortable';
 
 // Import API service
-import { tabsApi, subtopicsApi, itemsApi, checklistApi, applicationsApi, activityApi, dashboardApi, imagesApi } from './services/api';
+import { tabsApi, subtopicsApi, itemsApi, checklistApi, applicationsApi, activityApi, dashboardApi } from './services/api';
 import { CodeAvatar, LoadingSpinner, ErrorMessage, SortableTopicSection, SortableAccordionItem, AppModals, ChecklistView, ApplicationTrackerView, JournalView, HabitsView } from './components';
 
 // Icon mapping
