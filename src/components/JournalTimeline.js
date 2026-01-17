@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, ChevronDown, Zap } from 'lucide-react';
+import { ChevronDown, Zap } from 'lucide-react';
 
 function JournalTimeline({ activityLog }) {
   const [hoveredDate, setHoveredDate] = useState(null);
@@ -113,10 +113,7 @@ function JournalTimeline({ activityLog }) {
             <div className="row-content">
               {/* Collapsed: One line view */}
               <div className="row-summary">
-                <span className="row-date">
-                  <Calendar size={12} />
-                  {formatDate(date)}
-                </span>
+                <span className="row-date">{formatDate(date)}</span>
                 <div className="row-divider"></div>
                 <div className="row-categories">
                   {getCategories(groupedByDate[date]).map((cat, i) => (
